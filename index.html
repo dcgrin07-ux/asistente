@@ -35,7 +35,6 @@
         const app = initializeApp(firebaseConfig);
         const dbCloud = getDatabase(app);
 
-        // Variables globales de datos
         window.db = [];
         window.agendaHospital = {};
         window.listaEsperaData = '';
@@ -51,7 +50,6 @@
                     window.listaEsperaData = data.listaEspera || '';
                     window.exPacientesDb = data.exPacientes || [];
                 }
-                // Actualizar vistas si ya están inicializadas
                 if(typeof renderizarTurnosDia === 'function' && document.getElementById('hospital-turnos-view').style.display === 'block') {
                     renderizarTurnosDia();
                 }
@@ -78,7 +76,6 @@
             });
         };
 
-        // Cargar datos al iniciar la página
         window.addEventListener('DOMContentLoaded', async () => {
             await window.sincronizarConNube();
         });
@@ -87,7 +84,6 @@
 <body>
 
 <div class="container">
-    <!-- MENÚ PRINCIPAL -->
     <div id="nav-menu">
         <h1>Ámbito de Trabajo (Nube ☁️)</h1>
         <button class="btn-menu" onclick="iniciarModulo('ESCUELA')">🏫 ESCUELA</button>
@@ -99,7 +95,6 @@
         <button class="btn-menu" style="background:#d35400" onclick="exportarRespaldo()">3. DESCARGAR RESPALDO GENERAL</button>
     </div>
 
-    <!-- SUBMENÚ HOSPITAL (Días) -->
     <div id="hospital-dias" style="display:none;">
         <button onclick="location.reload()">⬅ Volver al Menú Principal</button>
         <h2>🏥 Agenda Hospital - Seleccioná el Día</h2>
@@ -115,14 +110,12 @@
         <div id="lista-ex-pacientes"></div>
     </div>
 
-    <!-- VISTA DE TURNOS DE UN DÍA -->
     <div id="hospital-turnos-view" style="display:none;">
         <button onclick="iniciarMenuHospital()">⬅ Volver a Días</button>
         <h2 id="titulo-dia"></h2>
         <div id="contenedor-6-turnos"></div>
     </div>
 
-    <!-- ÁREA DE TRABAJO PACIENTE (Ficha Individual) -->
     <div id="work-area" style="display:none;">
         <button onclick="volverDesdeFicha()">⬅ Volver a la Agenda</button>
         <h2 id="titulo-ambito"></h2>
@@ -146,7 +139,6 @@
         <div id="lista-historial"></div>
     </div>
 
-    <!-- MÓDULO ESCUELA / EIPRI (Estándar) -->
     <div id="work-area-general" style="display:none;">
         <button onclick="location.reload()">⬅ Volver</button>
         <h2 id="titulo-ambito-gen"></h2>
@@ -176,7 +168,6 @@
     let turnoActualIdx = null;
     let pacienteActualNombre = '';
 
-    // ESCUELA / EIPRI
     function iniciarModulo(ambito) {
         ambitoActual = ambito;
         document.getElementById('nav-menu').style.display = 'none';
@@ -185,7 +176,6 @@
         renderizarHistorialGen();
     }
 
-    // HOSPITAL - MENÚ DÍAS
     function iniciarMenuHospital() {
         document.getElementById('nav-menu').style.display = 'none';
         document.getElementById('work-area').style.display = 'none';
