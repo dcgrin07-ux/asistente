@@ -15,18 +15,86 @@
         @media(max-width: 600px) { .grid-turnos { grid-template-columns: 1fr; } }
         #file-input { display: none; }
     </style>
+
+    <!-- Firebase App (Modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+          apiKey: "AIzaSyAv4ErfP4i5aduTRCpraWpyOO6lyoSYhbo",
+          authDomain: "asistente-7770a.firebaseapp.com",
+          databaseURL: "https://asistente-7770a-default-rtdb.firebaseio.com",
+          projectId: "asistente-7770a",
+          storageBucket: "asistente-7770a.firebasestorage.app",
+          messagingSenderId: "766477035272",
+          appId: "1:766477035272:web:29af83ae2cec654a316ebd",
+          measurementId: "G-GMW3EM3M6S"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const dbCloud = getDatabase(app);
+
+        // Variables globales de datos
+        window.db = [];
+        window.agendaHospital = {};
+        window.listaEsperaData = '';
+        window.exPacientesDb = [];
+
+        window.sincronizarConNube = async function() {
+            try {
+                const snapshot = await get(ref(dbCloud, 'psico_data'));
+                if (snapshot.exists()) {
+                    const data = snapshot.val();
+                    window.db = data.db || [];
+                    window.agendaHospital = data.agendaHospital || {};
+                    window.listaEsperaData = data.listaEspera || '';
+                    window.exPacientesDb = data.exPacientes || [];
+                }
+                // Actualizar vistas si ya están inicializadas
+                if(typeof renderizarTurnosDia === 'function' && document.getElementById('hospital-turnos-view').style.display === 'block') {
+                    renderizarTurnosDia();
+                }
+                if(typeof renderizarHistorial === 'function' && document.getElementById('work-area').style.display === 'block') {
+                    renderizarHistorial();
+                }
+                if(typeof renderizarHistorialGen === 'function' && document.getElementById('work-area-general').style.display === 'block') {
+                    renderizarHistorialGen();
+                }
+            } catch (error) {
+                console.error("Error al leer de la nube:", error);
+            }
+        };
+
+        window.guardarEnNube = function() {
+            const dataCompleta = {
+                db: window.db,
+                agendaHospital: window.agendaHospital,
+                listaEspera: window.listaEsperaData,
+                exPacientes: window.exPacientesDb
+            };
+            set(ref(dbCloud, 'psico_data'), dataCompleta).catch((error) => {
+                console.error("Error al guardar en la nube:", error);
+            });
+        };
+
+        // Cargar datos al iniciar la página
+        window.addEventListener('DOMContentLoaded', async () => {
+            await window.sincronizarConNube();
+        });
+    </script>
 </head>
 <body>
 
 <div class="container">
     <!-- MENÚ PRINCIPAL -->
     <div id="nav-menu">
-        <h1>Ámbito de Trabajo</h1>
+        <h1>Ámbito de Trabajo (Nube ☁️)</h1>
         <button class="btn-menu" onclick="iniciarModulo('ESCUELA')">🏫 ESCUELA</button>
         <button class="btn-menu" onclick="iniciarModulo('EIPRI')">👶 EIPRI</button>
         <button class="btn-menu" style="background:#16a085" onclick="iniciarMenuHospital()">🏥 HOSPITAL (Agenda y Consultorio)</button>
         <hr>
-        <button class="btn-menu" style="background:#8e44ad" onclick="document.getElementById('file-input').click()">📂 CARGAR RESPALDO DESDE DRIVE</button>
+        <button class="btn-menu" style="background:#8e44ad" onclick="document.getElementById('file-input').click()">📂 CARGAR RESPALDO LOCAL</button>
         <input type="file" id="file-input" accept=".json" onchange="cargarRespaldo(event)">
         <button class="btn-menu" style="background:#d35400" onclick="exportarRespaldo()">3. DESCARGAR RESPALDO GENERAL</button>
     </div>
@@ -103,11 +171,6 @@
 </div>
 
 <script>
-    let db = JSON.parse(localStorage.getItem('psico_db') || '[]');
-    let agendaHospital = JSON.parse(localStorage.getItem('psico_agenda_hospital') || '{}');
-    let listaEsperaData = localStorage.getItem('psico_espera') || '';
-    let exPacientesDb = JSON.parse(localStorage.getItem('psico_ex_pacientes') || '[]');
-    
     let ambitoActual = '';
     let diaActual = '';
     let turnoActualIdx = null;
@@ -129,13 +192,13 @@
         document.getElementById('hospital-turnos-view').style.display = 'none';
         document.getElementById('hospital-dias').style.display = 'block';
         
-        document.getElementById('lista-espera').value = listaEsperaData;
+        document.getElementById('lista-espera').value = window.listaEsperaData || '';
         renderizarExPacientes();
     }
 
     function guardarEspera() {
-        listaEsperaData = document.getElementById('lista-espera').value;
-        localStorage.setItem('psico_espera', listaEsperaData);
+        window.listaEsperaData = document.getElementById('lista-espera').value;
+        window.guardarEnNube();
     }
 
     function abrirDia(dia) {
@@ -148,13 +211,13 @@
 
     function renderizarTurnosDia() {
         let cont = document.getElementById('contenedor-6-turnos');
-        if(!agendaHospital[diaActual]) {
-            agendaHospital[diaActual] = Array(6).fill({nombre: '', edad: '', dni: ''});
+        if(!window.agendaHospital[diaActual]) {
+            window.agendaHospital[diaActual] = Array(6).fill({nombre: '', edad: '', dni: ''});
         }
 
         let html = '';
         for(let i=0; i<6; i++) {
-            let t = agendaHospital[diaActual][i] || {nombre: '', edad: '', dni: ''};
+            let t = window.agendaHospital[diaActual][i] || {nombre: '', edad: '', dni: ''};
             html += `
                 <div class="turno-box">
                     <strong>Turno ${i+1}</strong>
@@ -176,12 +239,12 @@
         let edad = document.getElementById(`edad_t_${i}`).value;
         let dni = document.getElementById(`dni_t_${i}`).value;
 
-        agendaHospital[diaActual][i] = {nombre, edad, dni};
-        localStorage.setItem('psico_agenda_hospital', JSON.stringify(agendaHospital));
+        window.agendaHospital[diaActual][i] = {nombre, edad, dni};
+        window.guardarEnNube();
     }
 
     function abrirFichaTurno(i) {
-        let t = agendaHospital[diaActual][i];
+        let t = window.agendaHospital[diaActual][i];
         if(!t || !t.nombre) return alert("Primero ingresá al menos el nombre del paciente en este turno.");
         
         turnoActualIdx = i;
@@ -204,20 +267,18 @@
     }
 
     function liberarTurno(i) {
-        let t = agendaHospital[diaActual][i];
+        let t = window.agendaHospital[diaActual][i];
         if(!t || !t.nombre) return alert("Este turno ya está vacío.");
         
         if(confirm(`¿Estás seguro de dar de alta a ${t.nombre}? El turno quedará libre y sus datos se moverán a Ex Pacientes.`)) {
-            let pIndex = db.findIndex(x => x.nombre === t.nombre && x.ambito.includes('HOSPITAL'));
+            let pIndex = window.db.findIndex(x => x.nombre === t.nombre && x.ambito.includes('HOSPITAL'));
             if(pIndex !== -1) {
-                exPacientesDb.push(db[pIndex]);
-                db.splice(pIndex, 1);
-                localStorage.setItem('psico_db', JSON.stringify(db));
-                localStorage.setItem('psico_ex_pacientes', JSON.stringify(exPacientesDb));
+                window.exPacientesDb.push(window.db[pIndex]);
+                window.db.splice(pIndex, 1);
             }
 
-            agendaHospital[diaActual][i] = {nombre: '', edad: '', dni: ''};
-            localStorage.setItem('psico_agenda_hospital', JSON.stringify(agendaHospital));
+            window.agendaHospital[diaActual][i] = {nombre: '', edad: '', dni: ''};
+            window.guardarEnNube();
             renderizarTurnosDia();
             alert("Turno liberado y paciente archivado correctamente.");
         }
@@ -225,11 +286,11 @@
 
     function renderizarExPacientes() {
         let cont = document.getElementById('lista-ex-pacientes');
-        if(exPacientesDb.length === 0) {
+        if(!window.exPacientesDb || window.exPacientesDb.length === 0) {
             cont.innerHTML = "<p style='color:#7f8c8d;'>No hay ex pacientes archivados todavía.</p>";
             return;
         }
-        cont.innerHTML = exPacientesDb.map(p => `
+        cont.innerHTML = window.exPacientesDb.map(p => `
             <div class="historial-card" style="border-left-color: #e67e22;">
                 <strong>Ex Paciente: ${p.nombre}</strong>
                 ${p.intervenciones.map(i => `
@@ -250,12 +311,12 @@
             fecha: new Date().toLocaleDateString()
         };
 
-        let p = db.find(x => x.nombre === nombre && x.ambito === ambitoActual);
+        let p = window.db.find(x => x.nombre === nombre && x.ambito === ambitoActual);
         if (p) { p.intervenciones.push(nueva); } 
-        else { db.push({ nombre, ambito: ambitoActual, intervenciones: [nueva] }); }
+        else { window.db.push({ nombre, ambito: ambitoActual, intervenciones: [nueva] }); }
         
-        localStorage.setItem('psico_db', JSON.stringify(db));
-        alert("¡Guardado en la ficha del paciente!");
+        window.guardarEnNube();
+        alert("¡Guardado en la nube con éxito!");
         document.getElementById('obs-nueva').value = '';
         document.getElementById('prompt-box').value = '';
         document.getElementById('respuesta-ia').value = '';
@@ -264,7 +325,7 @@
 
     function renderizarHistorial() {
         let cont = document.getElementById('lista-historial');
-        let pacientes = db.filter(x => x.ambito === ambitoActual && x.nombre === pacienteActualNombre);
+        let pacientes = window.db.filter(x => x.ambito === ambitoActual && x.nombre === pacienteActualNombre);
         cont.innerHTML = pacientes.map(p => `
             <div>
                 ${p.intervenciones.slice().reverse().map(i => `
@@ -278,10 +339,10 @@
     }
 
     function eliminarIntervencionFicha(n, id) {
-        let p = db.find(x => x.nombre === n && x.ambito === ambitoActual);
+        let p = window.db.find(x => x.nombre === n && x.ambito === ambitoActual);
         p.intervenciones = p.intervenciones.filter(i => i.id !== id);
-        if(p.intervenciones.length === 0) db = db.filter(x => x.nombre !== n || x.ambito !== ambitoActual);
-        localStorage.setItem('psico_db', JSON.stringify(db));
+        if(p.intervenciones.length === 0) window.db = window.db.filter(x => x.nombre !== n || x.ambito !== ambitoActual);
+        window.guardarEnNube();
         renderizarHistorial();
     }
 
@@ -298,18 +359,18 @@
             fecha: new Date().toLocaleDateString()
         };
 
-        let p = db.find(x => x.nombre === nombre && x.ambito === ambitoActual);
+        let p = window.db.find(x => x.nombre === nombre && x.ambito === ambitoActual);
         if (p) { p.intervenciones.push(nueva); } 
-        else { db.push({ nombre, ambito: ambitoActual, intervenciones: [nueva] }); }
+        else { window.db.push({ nombre, ambito: ambitoActual, intervenciones: [nueva] }); }
         
-        localStorage.setItem('psico_db', JSON.stringify(db));
-        alert("¡Guardado!");
+        window.guardarEnNube();
+        alert("¡Guardado en la nube con éxito!");
         renderizarHistorialGen();
     }
 
     function renderizarHistorialGen() {
         let cont = document.getElementById('lista-historial-gen');
-        let pacientes = db.filter(x => x.ambito === ambitoActual);
+        let pacientes = window.db.filter(x => x.ambito === ambitoActual);
         cont.innerHTML = pacientes.map(p => `
             <div><h4>Paciente: ${p.nombre}</h4>
                 ${p.intervenciones.slice().reverse().map(i => `
@@ -323,19 +384,19 @@
     }
 
     function eliminarIntervencionGen(n, id) {
-        let p = db.find(x => x.nombre === n && x.ambito === ambitoActual);
+        let p = window.db.find(x => x.nombre === n && x.ambito === ambitoActual);
         p.intervenciones = p.intervenciones.filter(i => i.id !== id);
-        if(p.intervenciones.length === 0) db = db.filter(x => x.nombre !== n || x.ambito !== ambitoActual);
-        localStorage.setItem('psico_db', JSON.stringify(db));
+        if(p.intervenciones.length === 0) window.db = window.db.filter(x => x.nombre !== n || x.ambito !== ambitoActual);
+        window.guardarEnNube();
         renderizarHistorialGen();
     }
 
     function exportarRespaldo() {
         let dataCompleta = {
-            db: db,
-            agendaHospital: agendaHospital,
-            listaEspera: listaEsperaData,
-            exPacientes: exPacientesDb
+            db: window.db,
+            agendaHospital: window.agendaHospital,
+            listaEspera: window.listaEsperaData,
+            exPacientes: window.exPacientesDb
         };
         let blob = new Blob([JSON.stringify(dataCompleta)], {type: 'application/json'});
         let a = document.createElement('a');
@@ -351,20 +412,16 @@
             try {
                 let dataCompleta = JSON.parse(e.target.result);
                 if(dataCompleta.db) {
-                    db = dataCompleta.db;
-                    agendaHospital = dataCompleta.agendaHospital || {};
-                    listaEsperaData = dataCompleta.listaEspera || '';
-                    exPacientesDb = dataCompleta.exPacientes || [];
+                    window.db = dataCompleta.db;
+                    window.agendaHospital = dataCompleta.agendaHospital || {};
+                    window.listaEsperaData = dataCompleta.listaEspera || '';
+                    window.exPacientesDb = dataCompleta.exPacientes || [];
                 } else {
-                    db = dataCompleta;
+                    window.db = dataCompleta;
                 }
 
-                localStorage.setItem('psico_db', JSON.stringify(db));
-                localStorage.setItem('psico_agenda_hospital', JSON.stringify(agendaHospital));
-                localStorage.setItem('psico_espera', listaEsperaData);
-                localStorage.setItem('psico_ex_pacientes', JSON.stringify(exPacientesDb));
-
-                alert("¡Respaldo cargado con éxito en todos los módulos!");
+                window.guardarEnNube();
+                alert("¡Respaldo cargado y sincronizado en la nube con éxito!");
                 location.reload();
             } catch(err) {
                 alert("El archivo no es válido.");
